@@ -1,0 +1,6 @@
+{
+  "name": "AvatarHub - 随机与自定义头像生成接口工作台",
+  "description": "全网主流随机与自定义头像API全景测评、实时交互生成器、参数调试台与多语言调用代码生成工具。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -9,6 +9,13 @@ import {
 import { AutoHealAvatar } from './AutoHealAvatar';
 import { TraitEditor } from './TraitEditor';
 import { 
+  AntiClogColorStrip, 
+  CMYK_CHANNELS, 
+  GRADIENT_FACTORS, 
+  getStepRgb 
+} from './AntiClogColorStrip';
+import { generateUniqueExportFilename } from '../utils/filename';
+import { 
   Download, 
   Printer, 
   Dices, 
@@ -90,7 +97,9 @@ export const A4SheetExporter: React.FC = () => {
       mood: 'any',
       glasses: 'any',
       beard: 'any',
-    }
+    },
+    enableAntiClogStrip: true,
+    antiClogShowHatch: true,
   });
 
   const [tiles, setTiles] = useState<TileItem[]>([]);
@@ -170,7 +179,37 @@ export const A4SheetExporter: React.FC = () => {
 
       // Margins
       const marginX = 80;
-      let topY = 80;
+      let topY = 60;
+
+      // Draw CMYK Anti-Clog Color Strip if enabled (matching reference photo: 10 seamless gradient steps, no percentages)
+      if (config.enableAntiClogStrip) {
+        const stripStartY = topY;
+        const rowHeight = 32;
+        const rowGap = 10;
+        const labelWidth = 110;
+        const barsStartX = marginX + labelWidth;
+        const totalBarWidth = width - marginX * 2 - labelWidth;
+        const blockWidth = totalBarWidth / GRADIENT_FACTORS.length;
+
+        CMYK_CHANNELS.forEach((ch, idx) => {
+          const currentY = stripStartY + idx * (rowHeight + rowGap);
+
+          // 1. Channel Label: 黑 K, 青 C, 品红 M, 黄 Y (bold sans-serif, matching reference image)
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(ch.label, marginX + 4, currentY + 25);
+
+          // 2. 10-step gradient blocks without percentage numbers
+          GRADIENT_FACTORS.forEach((factor, fIdx) => {
+            const bx = barsStartX + fIdx * blockWidth;
+            ctx.fillStyle = getStepRgb(ch.r, ch.g, ch.b, factor);
+            ctx.fillRect(bx, currentY, Math.ceil(blockWidth), rowHeight);
+          });
+        });
+
+        topY += CMYK_CHANNELS.length * (rowHeight + rowGap) + 24;
+      }
 
       // 2. Draw optional header
       if (config.sheetTitle) {
@@ -315,14 +354,19 @@ export const A4SheetExporter: React.FC = () => {
         }
       }
 
-      // 5. Download file
+      // 5. Download file with guaranteed unique filename (never repeats)
       canvas.toBlob((blob) => {
         if (!blob) throw new Error('Blob creation failed');
         const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
         const styleName = config.styleMode === 'single' ? config.selectedStyle : 'mixed';
-        a.download = `A4_Avatar_Sheet_${styleName}_${totalCount}.png`;
+        a.download = generateUniqueExportFilename({
+          prefix: 'A4_Avatar_Sheet',
+          style: styleName,
+          count: totalCount,
+          ext: 'png'
+        });
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -339,7 +383,22 @@ export const A4SheetExporter: React.FC = () => {
   };
 
   const handlePrint = () => {
+    // Dynamically set document.title so browser's "Save as PDF" suggests a unique non-repeating filename
+    const styleName = config.styleMode === 'single' ? config.selectedStyle : 'mixed';
+    const uniquePdfTitle = generateUniqueExportFilename({
+      prefix: 'A4_Avatar_Sheet',
+      style: styleName,
+      count: totalCount,
+      ext: 'pdf'
+    }).replace(/\.pdf$/i, '');
+
+    const prevTitle = document.title;
+    document.title = uniquePdfTitle;
     window.print();
+    // Restore title after print dialog closes
+    setTimeout(() => {
+      document.title = prevTitle;
+    }, 1500);
   };
 
   const borderCssRgba = config.hasBorder 
@@ -407,6 +466,24 @@ export const A4SheetExporter: React.FC = () => {
           </span>
         )}
       </div>
+
+      {/* Epson L4266 & Inkjet Anti-Clog Guard Active Notice */}
+      {config.enableAntiClogStrip && (
+        <div className="rounded-xl bg-indigo-50/80 border border-indigo-200/80 px-4 py-3 flex items-center justify-between gap-3 text-xs text-indigo-950 no-print animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+            <span>
+              <strong>爱普生 L4266 喷墨防堵与 CMYK 状态校准色条已开启：</strong> A4 顶部将同步置入黑、青、品红、黄四色条（含 100% 实色、阶梯浅色与渐变过渡及喷嘴微型排查标尺），在每次打印时全通道出墨防干涸，并方便直观核对是否缺色或有白色拉丝横纹。
+            </span>
+          </div>
+          <button
+            onClick={() => setConfig(prev => ({ ...prev, enableAntiClogStrip: false }))}
+            className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline shrink-0"
+          >
+            关闭色条
+          </button>
+        </div>
+      )}
 
       {/* Main Grid: Control Sidebar + A4 Sheet Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -844,6 +921,78 @@ export const A4SheetExporter: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* 6. 爱普生喷墨防堵与 CMYK 检测色条 (Epson L4266 Guard) */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-indigo-600" />
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  6. 爱普生喷墨防堵与 CMYK 色条
+                </label>
+              </div>
+
+              {/* Master Toggle */}
+              <button
+                onClick={() => setConfig(prev => ({ ...prev, enableAntiClogStrip: !prev.enableAntiClogStrip }))}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                  config.enableAntiClogStrip
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 border-slate-200 text-slate-600'
+                }`}
+              >
+                {config.enableAntiClogStrip ? '已开启防堵色条' : '未开启'}
+              </button>
+            </div>
+
+            {config.enableAntiClogStrip ? (
+              <div className="space-y-3 pt-2 border-t border-slate-100 animate-in fade-in duration-150">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  在 A4 纸张顶部加入<strong>黑 (K)、青 (C)、品红 (M)、黄 (Y)</strong> 四条标准校准色带（包含 10 阶实色到浅色渐变方块，无文字干扰），方便肉眼对比观察是否缺色或有断线横纹。
+                </p>
+
+                {/* Mini Preview matching reference photo */}
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="space-y-1.5">
+                    {CMYK_CHANNELS.map(ch => (
+                      <div key={ch.label} className="flex items-center gap-2">
+                        <span className="w-12 text-[11px] font-bold text-slate-800 shrink-0 font-sans">
+                          {ch.label}
+                        </span>
+                        <div className="flex-1 grid grid-cols-10 h-4 rounded-xs overflow-hidden border border-slate-200">
+                          {GRADIENT_FACTORS.map((factor, fIdx) => (
+                            <div 
+                              key={fIdx}
+                              className="w-full h-full"
+                              style={{
+                                backgroundColor: getStepRgb(ch.r, ch.g, ch.b, factor)
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Diagnostic helper guide */}
+                <div className="rounded-xl bg-amber-50/80 border border-amber-200 p-3 text-[11px] text-amber-950 space-y-1.5 leading-relaxed">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                    <span>💡 爱普生 L4266 喷头观察指南：</span>
+                  </div>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-700">
+                    <li><strong>横纹断线排查</strong>：打印后若右侧浅色色块出现<strong>白色横向条纹或拉丝</strong>，说明对应颜色微压电喷嘴轻微堵塞或偏针；</li>
+                    <li><strong>缺色判定</strong>：若左侧深色实色块未喷出或发白，说明对应墨路气阻或主喷嘴断墨；</li>
+                    <li><strong>防堵养护</strong>：建议每周打印一次带四色彩带的画报，保持爱普生 L4266 墨路润滑畅通。</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500">
+                开启后将在 A4 顶部自动生成 CMYK 防堵色条，打印时让全部喷嘴均得到墨水湿润冲刷。
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Right: Realistic A4 Paper Sheet Preview (8 cols) */}
@@ -856,6 +1005,12 @@ export const A4SheetExporter: React.FC = () => {
                 A4 比例预览 (210mm × 297mm · 纯白底色)
               </span>
               <span>· 共 {totalCount} 个随机头像</span>
+              {config.enableAntiClogStrip && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>四色校准条已挂载</span>
+                </span>
+              )}
               {config.hasBorder && (
                 <span className="inline-flex items-center gap-1 text-[11px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                   <span
@@ -898,6 +1053,11 @@ export const A4SheetExporter: React.FC = () => {
               }}
               className="relative p-6 sm:p-10 shadow-2xl transition-all duration-200 flex flex-col justify-between"
             >
+              {/* Optional Anti-Clog CMYK Strip at the top of A4 paper */}
+              {config.enableAntiClogStrip && (
+                <AntiClogColorStrip />
+              )}
+
               {/* Optional Header */}
               {config.sheetTitle && (
                 <div className="text-center pb-4 mb-4 border-b border-slate-200">

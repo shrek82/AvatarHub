@@ -102,4 +102,6 @@ export interface A4SheetConfig {
   subtitle: string;
   avatarBgColor: string; // transparent or light
   traits?: CustomTraitsConfig;
+  enableAntiClogStrip?: boolean; // Epson L4266 & inkjet anti-clog CMYK test strip
+  antiClogShowHatch?: boolean; // Show fine nozzle check hatch lines for banding detection
 }

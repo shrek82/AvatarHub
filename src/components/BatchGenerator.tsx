@@ -6,6 +6,7 @@ import {
   buildAvatarUrl, 
   getRandomSeed 
 } from '../data/avatarApis';
+import { generateUniqueExportFilename } from '../utils/filename';
 import { 
   Dices, 
   Copy, 
@@ -249,11 +250,16 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
 
                   <a
                     href={url}
-                    download={`avatar_${seed}.svg`}
+                    download={generateUniqueExportFilename({
+                      prefix: 'avatar',
+                      style: selectedProvider === 'dicebear' ? selectedStyle : selectedProvider,
+                      seed: seed,
+                      ext: 'svg'
+                    })}
                     target="_blank"
                     rel="noreferrer"
                     className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 transition-colors"
-                    title="下载或新标签打开"
+                    title="下载头像"
                   >
                     <Download className="w-3 h-3" />
                   </a>

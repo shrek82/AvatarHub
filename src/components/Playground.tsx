@@ -12,6 +12,7 @@ import {
   getRandomSeed 
 } from '../data/avatarApis';
 import { TraitEditor } from './TraitEditor';
+import { generateUniqueExportFilename } from '../utils/filename';
 import { 
   Dices, 
   Copy, 
@@ -95,7 +96,12 @@ export const Playground: React.FC<PlaygroundProps> = ({
       const link = document.createElement('a');
       link.href = blobUrl;
       const ext = config.format === 'png' ? 'png' : config.format === 'jpg' ? 'jpg' : 'svg';
-      link.download = `avatar_${config.providerId}_${config.seed}.${ext}`;
+      link.download = generateUniqueExportFilename({
+        prefix: 'avatar',
+        style: config.providerId === 'dicebear' ? config.style : config.providerId,
+        seed: config.seed,
+        ext: ext
+      });
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

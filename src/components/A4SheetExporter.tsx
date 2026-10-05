@@ -959,7 +959,7 @@ export const A4SheetExporter: React.FC = () => {
                         <span className="w-12 text-[11px] font-bold text-slate-800 shrink-0 font-sans">
                           {ch.label}
                         </span>
-                        <div className="flex-1 grid grid-cols-10 h-4 rounded-xs overflow-hidden border border-slate-200">
+                        <div className="flex-1 grid grid-cols-10 h-4 overflow-hidden">
                           {GRADIENT_FACTORS.map((factor, fIdx) => (
                             <div 
                               key={fIdx}

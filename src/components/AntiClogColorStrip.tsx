@@ -40,8 +40,8 @@ export const AntiClogColorStrip: React.FC = () => {
             {ch.label}
           </span>
 
-          {/* 10-Step Seamless Color Bars without percentage numbers */}
-          <div className="flex-1 grid grid-cols-10 h-5 sm:h-7 rounded-xs overflow-hidden shadow-2xs border border-slate-200/50">
+          {/* 10-Step Seamless Color Bars without percentage numbers and without borders */}
+          <div className="flex-1 grid grid-cols-10 h-5 sm:h-7 overflow-hidden">
             {GRADIENT_FACTORS.map((factor, idx) => (
               <div
                 key={idx}
